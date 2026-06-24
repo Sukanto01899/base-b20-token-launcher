@@ -29,7 +29,7 @@ function NetworkSwitcher() {
         onClick={() => setIsOpen((prev) => !prev)}
         className="flex items-center gap-1.5 rounded-full border border-zinc-200 px-3 py-1.5 text-xs font-medium text-foreground"
       >
-        Testnet
+        Base Sepolia
         <svg
           viewBox="0 0 20 20"
           fill="currentColor"
@@ -45,13 +45,13 @@ function NetworkSwitcher() {
       {isOpen && (
         <div className="absolute right-0 z-10 mt-1 w-40 rounded-lg border border-zinc-200 bg-white p-1 text-xs shadow-lg">
           <div className="flex items-center rounded-md bg-primary/5 px-2 py-1.5 font-medium text-primary">
-            Testnet
+            Base Sepolia
           </div>
           <div
             title="Mainnet support is coming soon"
             className="flex cursor-not-allowed items-center justify-between gap-2 rounded-md px-2 py-1.5 text-zinc-400"
           >
-            Mainnet
+            Base Mainnet
             <span className="rounded-full bg-zinc-100 px-1.5 py-0.5 text-[10px]">
               Soon
             </span>
