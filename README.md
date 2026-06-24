@@ -1,36 +1,16 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# B20 Token Launcher
 
-## Getting Started
+Deploy and mint [B20 tokens](https://docs.base.org/get-started/launch-b20-token) on Base Sepolia in one click. Everything signs client-side through your own wallet (RainbowKit + wagmi + viem) — there's no backend and no private keys ever touch a server.
 
-First, run the development server:
+**Live site:** [TODO: add deployed URL here]
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+## How to use it
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+1. Open the site and click **Connect Wallet** (top right) — pick your wallet, or scan the QR code with a mobile wallet.
+2. Make sure you're on **Base Sepolia** — the app will prompt you to switch if you're on the wrong network.
+3. Use the **Deploy B20 / Mint Tokens** switcher (left side) to pick what you want to do:
+   - **Deploy B20** — choose ASSET or STABLECOIN, fill in name/symbol/decimals (or currency code), optionally check "Grant myself MINT_ROLE" and set a supply cap, then hit **Deploy B20 Token**. Confirm the transaction in your wallet. Your deployed token is remembered in this browser for next time.
+   - **Mint Tokens** — pick a token you've deployed (or paste any token address), see how much has been minted and its cap, enter an amount, and hit **Mint**. If you don't have `MINT_ROLE` but you do hold the token's admin role, the app lets you grant `MINT_ROLE` to any address right there.
+4. Tap the **?** icons or the FAQ accordion at the bottom if anything ("MINT_ROLE", "supply cap", "B20" itself) isn't clear.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+See the [repo-level README](../README.md) for the Foundry CLI scripts behind this app, and [src/lib/b20.ts](src/lib/b20.ts) if you're extending the on-chain encoding.
