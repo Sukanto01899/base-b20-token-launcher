@@ -2,7 +2,7 @@
 
 Deploy and mint [B20 tokens](https://docs.base.org/get-started/launch-b20-token) on Base Sepolia in one click. Everything signs client-side through your own wallet (RainbowKit + wagmi + viem) — there's no backend and no private keys ever touch a server.
 
-**Live site:** [TODO: add deployed URL here]
+**Live site:** [deployb20.xyz](https://www.deployb20.xyz)
 
 ## How to use it
 
