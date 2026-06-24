@@ -19,6 +19,10 @@ export type B20VariantName = keyof typeof B20Variant;
 export const MINT_ROLE = keccak256(toBytes("MINT_ROLE"));
 export const DEFAULT_ADMIN_ROLE: Hex = zeroHash;
 
+// Base Builder Code (bc_72x9anrx) attribution suffix — ERC-8021. Appended to every
+// transaction we send so onchain activity from this app is attributed to our builder code.
+export const BUILDER_CODE_DATA_SUFFIX: Hex = "0x62635f37327839616e72780b0080218021802180218021802180218021";
+
 // uint128.max — the factory's "no cap" sentinel.
 export const NO_SUPPLY_CAP = 2n ** 128n - 1n;
 

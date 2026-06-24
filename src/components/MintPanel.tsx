@@ -3,7 +3,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { formatUnits, isAddress, parseUnits, type Address } from "viem";
 import { useAccount, useReadContracts, useWaitForTransactionReceipt, useWriteContract } from "wagmi";
-import { DEFAULT_ADMIN_ROLE, MINT_ROLE, NO_SUPPLY_CAP, b20TokenAbi, formatContractError } from "@/lib/b20";
+import {
+  BUILDER_CODE_DATA_SUFFIX,
+  DEFAULT_ADMIN_ROLE,
+  MINT_ROLE,
+  NO_SUPPLY_CAP,
+  b20TokenAbi,
+  formatContractError,
+} from "@/lib/b20";
 import { getDeployedTokens } from "@/lib/storage";
 
 export function MintPanel() {
@@ -95,6 +102,7 @@ export function MintPanel() {
       abi: b20TokenAbi,
       functionName: "grantRole",
       args: [MINT_ROLE, grantAddress],
+      dataSuffix: BUILDER_CODE_DATA_SUFFIX,
     });
   }
 
@@ -106,6 +114,7 @@ export function MintPanel() {
       abi: b20TokenAbi,
       functionName: "mint",
       args: [account, amountBigInt],
+      dataSuffix: BUILDER_CODE_DATA_SUFFIX,
     });
   }
 

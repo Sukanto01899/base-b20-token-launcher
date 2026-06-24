@@ -14,6 +14,7 @@ import { saveDeployedToken } from "@/lib/storage";
 import {
   B20Variant,
   B20_FACTORY_ADDRESS,
+  BUILDER_CODE_DATA_SUFFIX,
   MINT_ROLE,
   NO_SUPPLY_CAP,
   b20FactoryAbi,
@@ -190,6 +191,7 @@ export default function Home() {
       abi: b20FactoryAbi,
       functionName: "createB20",
       args: [B20Variant[variant], salt, params, initCalls],
+      dataSuffix: BUILDER_CODE_DATA_SUFFIX,
     });
   }
 
