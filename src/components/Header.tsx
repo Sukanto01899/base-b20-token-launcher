@@ -67,7 +67,7 @@ export function Header() {
     <header className="sticky top-0 z-50 flex items-center justify-between gap-3 border-b border-zinc-200 bg-white px-4 py-3 sm:px-6">
       <div className="flex flex-col leading-tight sm:flex-row sm:items-center sm:gap-2">
         <Image
-          src="/B20.png"
+          src="/B20-logo.png"
           alt="B20"
           width={640}
           height={310}
