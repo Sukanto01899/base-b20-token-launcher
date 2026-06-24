@@ -17,6 +17,7 @@ export const metadata: Metadata = {
   description: "Deploy a base B20 token on Base in one click.",
   other: {
     "base:app_id": "6a3b7c55664da9c3731e1c96",
+    "google-site-verification": "YwUN___HBLT-UAxQnNtPCLegEn2fxcVqfKonhg06WjQ",
   },
 };
 
