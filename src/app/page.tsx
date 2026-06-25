@@ -9,7 +9,10 @@ import {
   useWriteContract,
 } from "wagmi";
 import { baseSepolia } from "wagmi/chains";
+import { CheckMemoPanel } from "@/components/CheckMemoPanel";
 import { MintPanel } from "@/components/MintPanel";
+import { PaymentPanel } from "@/components/PaymentPanel";
+import { FEATURES } from "@/lib/config";
 import { saveDeployedToken } from "@/lib/storage";
 import {
   B20Variant,
@@ -40,6 +43,25 @@ const MINT_INFO = {
   what: "Minting issues new supply of a B20 token you already deployed, sent directly to your wallet. It calls the token's mint function — it's a separate transaction from deployment.",
   why: "Use this after deploying (or for any token where you hold MINT_ROLE) to actually put tokens in circulation. Deploying alone only sets up the token and its supply cap — it never mints anything by itself.",
 } as const;
+
+const PAYMENT_MODE_INFO = {
+  send: {
+    what: "Sends a B20 token to any address with an onchain memo attached — a bytes32 reference (like an order ID) that's emitted alongside the transfer in a Memo event.",
+    why: "Use this to test paying with B20 and tagging payments to orders, the same pattern apps use to match incoming payments to what they're for, without a backend database.",
+  },
+  check: {
+    what: "Looks up a transaction by its hash and reads back the Memo event from it — who sent it, from which token, and what the memo says.",
+    why: "Use this to verify a payment actually carried the memo you expect, e.g. confirming a customer's transaction is tagged with the right order ID.",
+  },
+} as const;
+
+type TabId = "deploy" | "mint" | "payment";
+
+const TAB_LABELS: Record<TabId, string> = {
+  deploy: "Deploy B20",
+  mint: "Mint Tokens",
+  payment: "Payment",
+};
 
 const SUPPLY_CAP_PRESETS = [
   { label: "1M", value: "1000000" },
@@ -91,8 +113,12 @@ export default function Home() {
   const { address, isConnected, chainId } = useAccount();
   const { switchChain, isPending: isSwitching } = useSwitchChain();
 
-  const [activeTab, setActiveTab] = useState<"deploy" | "mint">("deploy");
-  const [variant, setVariant] = useState<"ASSET" | "STABLECOIN">("STABLECOIN");
+  const visibleTabs: TabId[] = FEATURES.paymentWithMemo
+    ? ["deploy", "mint", "payment"]
+    : ["deploy", "mint"];
+  const [activeTab, setActiveTab] = useState<TabId>("deploy");
+  const [paymentMode, setPaymentMode] = useState<"send" | "check">("send");
+  const [variant, setVariant] = useState<"ASSET" | "STABLECOIN">("ASSET");
   const [name, setName] = useState("My Token");
   const [symbol, setSymbol] = useState("MYT");
   const [decimals, setDecimals] = useState(18);
@@ -202,21 +228,26 @@ export default function Home() {
   // Each block is only ever visible in one layout at a time (the other is `hidden`),
   // and a flex column's items size independently — no shared row tracks like CSS grid,
   // so the Form's height never shifts the Selector/Explanation position.
+  const activeTabIndex = visibleTabs.indexOf(activeTab);
   const tabSwitcher = (
-    <div className="relative flex w-full max-w-xs rounded-full border border-zinc-200 p-1">
+    <div className="relative flex w-full max-w-md rounded-full border border-zinc-200 p-1">
       <div
-        className="absolute inset-y-1 left-1 w-[calc(50%-0.25rem)] rounded-full bg-primary transition-transform duration-300 ease-out"
-        style={{ transform: activeTab === "mint" ? "translateX(100%)" : "translateX(0%)" }}
+        className="absolute inset-y-1 rounded-full bg-primary transition-transform duration-300 ease-out"
+        style={{
+          left: "0.25rem",
+          width: `calc(${100 / visibleTabs.length}% - 0.25rem)`,
+          transform: `translateX(${activeTabIndex * 100}%)`,
+        }}
       />
-      {(["deploy", "mint"] as const).map((tab) => (
+      {visibleTabs.map((tab) => (
         <button
           key={tab}
           onClick={() => setActiveTab(tab)}
-          className={`relative z-10 flex-1 rounded-full px-3 py-2 text-sm font-medium transition-colors ${
+          className={`relative z-10 flex-1 whitespace-nowrap rounded-full px-2 py-2 text-xs font-medium transition-colors sm:px-3 sm:text-sm ${
             activeTab === tab ? "text-white" : "text-zinc-600"
           }`}
         >
-          {tab === "deploy" ? "Deploy B20" : "Mint Tokens"}
+          {TAB_LABELS[tab]}
         </button>
       ))}
     </div>
@@ -224,10 +255,14 @@ export default function Home() {
 
   const selectorBlock = (
     <div>
-      {activeTab === "deploy" ? (
+      {activeTab === "deploy" && (
         <>
-          <h1 className="text-2xl font-semibold text-foreground">Deploy a Base B20 Token</h1>
-          <p className="mt-1 text-sm text-zinc-500">Pick a variant to get started.</p>
+          <h1 className="text-2xl font-semibold text-foreground">
+            Deploy a Base B20 Token
+          </h1>
+          <p className="mt-1 text-sm text-zinc-500">
+            Pick a variant to get started.
+          </p>
           <div className="mt-4 flex gap-2">
             {(["ASSET", "STABLECOIN"] as const).map((v) => (
               <button
@@ -244,10 +279,40 @@ export default function Home() {
             ))}
           </div>
         </>
-      ) : (
+      )}
+      {activeTab === "mint" && (
         <>
-          <h1 className="text-2xl font-semibold text-foreground">Mint Deployed B20 Tokens</h1>
-          <p className="mt-1 text-sm text-zinc-500">Issue more supply for a token you control.</p>
+          <h1 className="text-2xl font-semibold text-foreground">
+            Mint Deployed B20 Tokens
+          </h1>
+          <p className="mt-1 text-sm text-zinc-500">
+            Issue more supply for a token you control.
+          </p>
+        </>
+      )}
+      {activeTab === "payment" && (
+        <>
+          <h1 className="text-2xl font-semibold text-foreground">
+            Pay with B20
+          </h1>
+          <p className="mt-1 text-sm text-zinc-500">
+            Send a token with a memo attached.
+          </p>
+          <div className="mt-4 flex gap-2">
+            {(["send", "check"] as const).map((mode) => (
+              <button
+                key={mode}
+                onClick={() => setPaymentMode(mode)}
+                className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
+                  paymentMode === mode
+                    ? "border-primary bg-primary text-white"
+                    : "border-zinc-200 text-zinc-600 hover:border-zinc-300"
+                }`}
+              >
+                {mode === "send" ? "Send Payment" : "Check Memo"}
+              </button>
+            ))}
+          </div>
         </>
       )}
     </div>
@@ -256,17 +321,38 @@ export default function Home() {
   const explanationBlock =
     activeTab === "deploy" ? (
       <div>
-        <h2 className="text-sm font-semibold text-foreground">What is {variant}?</h2>
+        <h2 className="text-sm font-semibold text-foreground">
+          What is {variant}?
+        </h2>
         <p className="mt-1 text-sm text-zinc-600">{info.what}</p>
-        <h2 className="mt-4 text-sm font-semibold text-foreground">Why choose it?</h2>
+        <h2 className="mt-4 text-sm font-semibold text-foreground">
+          Why choose it?
+        </h2>
         <p className="mt-1 text-sm text-zinc-600">{info.why}</p>
+      </div>
+    ) : activeTab === "mint" ? (
+      <div>
+        <h2 className="text-sm font-semibold text-foreground">
+          What is minting?
+        </h2>
+        <p className="mt-1 text-sm text-zinc-600">{MINT_INFO.what}</p>
+        <h2 className="mt-4 text-sm font-semibold text-foreground">
+          Why use it?
+        </h2>
+        <p className="mt-1 text-sm text-zinc-600">{MINT_INFO.why}</p>
       </div>
     ) : (
       <div>
-        <h2 className="text-sm font-semibold text-foreground">What is minting?</h2>
-        <p className="mt-1 text-sm text-zinc-600">{MINT_INFO.what}</p>
-        <h2 className="mt-4 text-sm font-semibold text-foreground">Why use it?</h2>
-        <p className="mt-1 text-sm text-zinc-600">{MINT_INFO.why}</p>
+        <h2 className="text-sm font-semibold text-foreground">What is this?</h2>
+        <p className="mt-1 text-sm text-zinc-600">
+          {PAYMENT_MODE_INFO[paymentMode].what}
+        </p>
+        <h2 className="mt-4 text-sm font-semibold text-foreground">
+          Why use it?
+        </h2>
+        <p className="mt-1 text-sm text-zinc-600">
+          {PAYMENT_MODE_INFO[paymentMode].why}
+        </p>
       </div>
     );
 
@@ -397,7 +483,11 @@ export default function Home() {
               {tokenAddress}
             </a>
           )}
-          <button type="button" onClick={() => setActiveTab("mint")} className="mt-1 block underline">
+          <button
+            type="button"
+            onClick={() => setActiveTab("mint")}
+            className="mt-1 block underline"
+          >
             Mint some now
           </button>
         </div>
@@ -405,7 +495,16 @@ export default function Home() {
     </div>
   );
 
-  const rightPanel = activeTab === "deploy" ? deployFormBlock : <MintPanel />;
+  const rightPanel =
+    activeTab === "deploy" ? (
+      deployFormBlock
+    ) : activeTab === "mint" ? (
+      <MintPanel />
+    ) : paymentMode === "send" ? (
+      <PaymentPanel />
+    ) : (
+      <CheckMemoPanel />
+    );
 
   return (
     <div className="flex flex-1 justify-center bg-white">

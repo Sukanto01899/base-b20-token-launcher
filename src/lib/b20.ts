@@ -11,7 +11,8 @@ import {
   zeroHash,
 } from "viem";
 
-export const B20_FACTORY_ADDRESS: Address = "0xB20f000000000000000000000000000000000000";
+export const B20_FACTORY_ADDRESS: Address =
+  "0xB20f000000000000000000000000000000000000";
 
 export const B20Variant = { ASSET: 0, STABLECOIN: 1 } as const;
 export type B20VariantName = keyof typeof B20Variant;
@@ -21,7 +22,8 @@ export const DEFAULT_ADMIN_ROLE: Hex = zeroHash;
 
 // Base Builder Code (bc_72x9anrx) attribution suffix — ERC-8021. Appended to every
 // transaction we send so onchain activity from this app is attributed to our builder code.
-export const BUILDER_CODE_DATA_SUFFIX: Hex = "0x62635f37327839616e72780b0080218021802180218021802180218021";
+export const BUILDER_CODE_DATA_SUFFIX: Hex =
+  "0x62635f78773575363131660b0080218021802180218021802180218021";
 
 // uint128.max — the factory's "no cap" sentinel.
 export const NO_SUPPLY_CAP = 2n ** 128n - 1n;
@@ -121,21 +123,90 @@ export const b20TokenAbi = [
     ],
     outputs: [],
   },
+  {
+    type: "function",
+    name: "transferWithMemo",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "to", type: "address" },
+      { name: "amount", type: "uint256" },
+      { name: "memo", type: "bytes32" },
+    ],
+    outputs: [{ type: "bool" }],
+  },
+  {
+    type: "event",
+    name: "Memo",
+    inputs: [
+      { name: "caller", type: "address", indexed: true },
+      { name: "memo", type: "bytes32", indexed: true },
+    ],
+  },
   // Errors below let viem decode revert reasons into readable names/args instead of raw selectors.
-  { type: "error", name: "AccessControlUnauthorizedAccount", inputs: [{ name: "account", type: "address" }, { name: "neededRole", type: "bytes32" }] },
-  { type: "error", name: "SupplyCapExceeded", inputs: [{ name: "cap", type: "uint256" }, { name: "attempted", type: "uint256" }] },
+  {
+    type: "error",
+    name: "AccessControlUnauthorizedAccount",
+    inputs: [
+      { name: "account", type: "address" },
+      { name: "neededRole", type: "bytes32" },
+    ],
+  },
+  {
+    type: "error",
+    name: "SupplyCapExceeded",
+    inputs: [
+      { name: "cap", type: "uint256" },
+      { name: "attempted", type: "uint256" },
+    ],
+  },
   { type: "error", name: "InvalidAmount", inputs: [] },
-  { type: "error", name: "InvalidReceiver", inputs: [{ name: "receiver", type: "address" }] },
-  { type: "error", name: "ContractPaused", inputs: [{ name: "feature", type: "uint8" }] },
-  { type: "error", name: "PolicyForbids", inputs: [{ name: "policyScope", type: "bytes32" }, { name: "policyId", type: "uint64" }] },
+  {
+    type: "error",
+    name: "InvalidReceiver",
+    inputs: [{ name: "receiver", type: "address" }],
+  },
+  {
+    type: "error",
+    name: "ContractPaused",
+    inputs: [{ name: "feature", type: "uint8" }],
+  },
+  {
+    type: "error",
+    name: "PolicyForbids",
+    inputs: [
+      { name: "policyScope", type: "bytes32" },
+      { name: "policyId", type: "uint64" },
+    ],
+  },
+  {
+    type: "error",
+    name: "InsufficientBalance",
+    inputs: [
+      { name: "sender", type: "address" },
+      { name: "balance", type: "uint256" },
+      { name: "needed", type: "uint256" },
+    ],
+  },
+  {
+    type: "error",
+    name: "InvalidSender",
+    inputs: [{ name: "sender", type: "address" }],
+  },
 ] as const;
 
 // abi.encode(struct) in Solidity wraps the struct as a single dynamic tuple argument — an
 // outer offset slot followed by the tuple's own head/tail encoding — not a flat field list.
 // These mirror B20FactoryLib's encoders by encoding a single tuple-typed parameter.
-export function encodeAssetCreateParams(name: string, symbol: string, initialAdmin: Address, decimals: number): Hex {
+export function encodeAssetCreateParams(
+  name: string,
+  symbol: string,
+  initialAdmin: Address,
+  decimals: number,
+): Hex {
   return encodeAbiParameters(
-    parseAbiParameters("(uint8 version, string name, string symbol, address initialAdmin, uint8 decimals)"),
+    parseAbiParameters(
+      "(uint8 version, string name, string symbol, address initialAdmin, uint8 decimals)",
+    ),
     [{ version: 1, name, symbol, initialAdmin, decimals }],
   );
 }
@@ -147,42 +218,62 @@ export function encodeStablecoinCreateParams(
   currency: string,
 ): Hex {
   return encodeAbiParameters(
-    parseAbiParameters("(uint8 version, string name, string symbol, address initialAdmin, string currency)"),
+    parseAbiParameters(
+      "(uint8 version, string name, string symbol, address initialAdmin, string currency)",
+    ),
     [{ version: 1, name, symbol, initialAdmin, currency }],
   );
 }
 
 export function encodeGrantRole(role: Hex, account: Address): Hex {
-  return encodeFunctionData({ abi: b20TokenAbi, functionName: "grantRole", args: [role, account] });
+  return encodeFunctionData({
+    abi: b20TokenAbi,
+    functionName: "grantRole",
+    args: [role, account],
+  });
 }
 
 export function encodeUpdateSupplyCap(newSupplyCap: bigint): Hex {
-  return encodeFunctionData({ abi: b20TokenAbi, functionName: "updateSupplyCap", args: [newSupplyCap] });
+  return encodeFunctionData({
+    abi: b20TokenAbi,
+    functionName: "updateSupplyCap",
+    args: [newSupplyCap],
+  });
 }
 
 // Pulls the new token address out of the B20Created event (token is topics[1], left-padded to 32 bytes).
-export function extractTokenAddress(logs: readonly { address: Address; topics: readonly Hex[] }[]): Address | null {
-  const log = logs.find((l) => l.address.toLowerCase() === B20_FACTORY_ADDRESS.toLowerCase());
+export function extractTokenAddress(
+  logs: readonly { address: Address; topics: readonly Hex[] }[],
+): Address | null {
+  const log = logs.find(
+    (l) => l.address.toLowerCase() === B20_FACTORY_ADDRESS.toLowerCase(),
+  );
   if (!log || !log.topics[1]) return null;
   return `0x${log.topics[1].slice(-40)}` as Address;
 }
 
 const CONTRACT_ERROR_MESSAGES: Record<string, string> = {
-  AccessControlUnauthorizedAccount: "This address does not have MINT_ROLE — it cannot mint this token.",
+  AccessControlUnauthorizedAccount:
+    "This address does not have MINT_ROLE — it cannot mint this token.",
   SupplyCapExceeded: "That amount would exceed this token's supply cap.",
   InvalidAmount: "Enter a valid, non-zero amount.",
   InvalidReceiver: "Invalid recipient address.",
-  ContractPaused: "Minting is currently paused for this token.",
-  PolicyForbids: "A policy rule on this token is blocking the mint.",
+  ContractPaused: "This action is currently paused for this token.",
+  PolicyForbids: "A policy rule on this token is blocking this transaction.",
+  InsufficientBalance: "You don't have enough balance for this.",
+  InvalidSender: "Invalid sender address.",
 };
 
 // Decodes a viem/wagmi contract error into a short, human-readable message.
 export function formatContractError(error: unknown): string {
   if (error instanceof BaseError) {
-    const revertError = error.walk((e) => e instanceof ContractFunctionRevertedError);
+    const revertError = error.walk(
+      (e) => e instanceof ContractFunctionRevertedError,
+    );
     if (revertError instanceof ContractFunctionRevertedError) {
       const errorName = revertError.data?.errorName;
-      if (errorName && CONTRACT_ERROR_MESSAGES[errorName]) return CONTRACT_ERROR_MESSAGES[errorName];
+      if (errorName && CONTRACT_ERROR_MESSAGES[errorName])
+        return CONTRACT_ERROR_MESSAGES[errorName];
     }
     return error.shortMessage;
   }

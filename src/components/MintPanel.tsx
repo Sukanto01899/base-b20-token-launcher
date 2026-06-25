@@ -226,7 +226,21 @@ export function MintPanel() {
                         : "Grant MINT_ROLE"}
                   </button>
                   {grantError && <p className="text-xs text-red-600">{formatContractError(grantError)}</p>}
-                  {isGrantSuccess && <p className="text-xs text-emerald-700">Granted — you can mint now.</p>}
+                  {isGrantSuccess && (
+                    <p className="text-xs text-emerald-700">
+                      Granted — you can mint now.
+                      {grantHash && (
+                        <a
+                          href={`https://sepolia.basescan.org/tx/${grantHash}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="ml-2 underline"
+                        >
+                          View transaction
+                        </a>
+                      )}
+                    </p>
+                  )}
                 </div>
               )}
             </div>
@@ -270,6 +284,16 @@ export function MintPanel() {
               {isSuccess && (
                 <div className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800">
                   Minted successfully.
+                  {hash && (
+                    <a
+                      href={`https://sepolia.basescan.org/tx/${hash}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="ml-2 underline"
+                    >
+                      View transaction
+                    </a>
+                  )}
                   <button
                     type="button"
                     onClick={() => {
