@@ -15,6 +15,13 @@ export function Footer() {
       </a>
       {" · "}
       <a
+        href="/mcp"
+        className="text-white underline hover:text-white/80"
+      >
+        B20 MCP
+      </a>
+      {" · "}
+      <a
         href="https://docs.base.org/get-started/launch-b20-token"
         target="_blank"
         rel="noopener noreferrer"

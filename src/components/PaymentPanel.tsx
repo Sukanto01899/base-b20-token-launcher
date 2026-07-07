@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { formatUnits, isAddress, parseUnits, stringToHex, type Address, type Hex } from "viem";
 import { useAccount, useReadContracts, useWaitForTransactionReceipt, useWriteContract } from "wagmi";
-import { BUILDER_CODE_DATA_SUFFIX, b20TokenAbi, formatContractError } from "@/lib/b20";
+import { BUILDER_CODE_DATA_SUFFIX, b20TokenAbi, formatContractError, isUserRejection } from "@/lib/b20";
 import { getDeployedTokens } from "@/lib/storage";
 
 function safeMemoToHex(memo: string): Hex | null {
@@ -24,8 +24,8 @@ function safeParseUnits(value: string, decimals: number): bigint | null {
 }
 
 export function PaymentPanel() {
-  const { address: account } = useAccount();
-  const savedTokens = useMemo(() => getDeployedTokens(), []);
+  const { address: account, chainId } = useAccount();
+  const savedTokens = useMemo(() => getDeployedTokens(chainId), [chainId]);
 
   const [selectedAddress, setSelectedAddress] = useState<string>(savedTokens[0]?.address ?? "");
   const [manualMode, setManualMode] = useState(savedTokens.length === 0);
@@ -33,6 +33,14 @@ export function PaymentPanel() {
   const [recipient, setRecipient] = useState("");
   const [amount, setAmount] = useState("");
   const [memo, setMemo] = useState("");
+
+  // Re-sync the picker when the connected network changes — a token saved on a
+  // different chain is no longer relevant, and the saved list itself just changed.
+  useEffect(() => {
+    setSelectedAddress(savedTokens[0]?.address ?? "");
+    setManualMode(savedTokens.length === 0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chainId]);
 
   const tokenAddress = manualMode ? manualAddress : selectedAddress;
   const isValidAddress = isAddress(tokenAddress);
@@ -71,6 +79,13 @@ export function PaymentPanel() {
 
   const { writeContract, data: hash, isPending, error: writeError, reset } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
+
+  // A tx hash from one network means nothing on another — waiting on it there would hang
+  // forever, leaving the button stuck on "Sending...". Clear it on network switch.
+  useEffect(() => {
+    reset();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chainId]);
 
   const amountBigInt = tokenLoaded && amount ? safeParseUnits(amount, decimals!.result!) : null;
   const memoHex = safeMemoToHex(memo);
@@ -221,7 +236,11 @@ export function PaymentPanel() {
             {isPending ? "Confirm in wallet..." : isConfirming ? "Sending..." : "Send Payment"}
           </button>
 
-          {writeError && <p className="text-sm text-red-600">{formatContractError(writeError)}</p>}
+          {writeError && (
+            <p className={`text-sm ${isUserRejection(writeError) ? "text-zinc-400" : "text-red-600"}`}>
+              {formatContractError(writeError)}
+            </p>
+          )}
 
           {isSuccess && (
             <div className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800">

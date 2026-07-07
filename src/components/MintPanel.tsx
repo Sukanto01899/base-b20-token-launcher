@@ -10,17 +10,26 @@ import {
   NO_SUPPLY_CAP,
   b20TokenAbi,
   formatContractError,
+  isUserRejection,
 } from "@/lib/b20";
 import { getDeployedTokens } from "@/lib/storage";
 
 export function MintPanel() {
-  const { address: account } = useAccount();
-  const savedTokens = useMemo(() => getDeployedTokens(), []);
+  const { address: account, chainId } = useAccount();
+  const savedTokens = useMemo(() => getDeployedTokens(chainId), [chainId]);
 
   const [selectedAddress, setSelectedAddress] = useState<string>(savedTokens[0]?.address ?? "");
   const [manualMode, setManualMode] = useState(savedTokens.length === 0);
   const [manualAddress, setManualAddress] = useState("");
   const [amount, setAmount] = useState("");
+
+  // Re-sync the picker when the connected network changes — a token saved on a
+  // different chain is no longer relevant, and the saved list itself just changed.
+  useEffect(() => {
+    setSelectedAddress(savedTokens[0]?.address ?? "");
+    setManualMode(savedTokens.length === 0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chainId]);
 
   const tokenAddress = manualMode ? manualAddress : selectedAddress;
   const isValidAddress = isAddress(tokenAddress);
@@ -81,6 +90,7 @@ export function MintPanel() {
     data: grantHash,
     isPending: isGrantPending,
     error: grantError,
+    reset: resetGrant,
   } = useWriteContract();
   const { isLoading: isGrantConfirming, isSuccess: isGrantSuccess } = useWaitForTransactionReceipt({
     hash: grantHash,
@@ -89,6 +99,14 @@ export function MintPanel() {
   useEffect(() => {
     if (isGrantSuccess) refetch();
   }, [isGrantSuccess, refetch]);
+
+  // A tx hash from one network means nothing on another — waiting on it there would hang
+  // forever, leaving the button stuck on "Minting.../Granting...". Clear it on network switch.
+  useEffect(() => {
+    reset();
+    resetGrant();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chainId]);
 
   function handleMax() {
     if (!tokenLoaded || remaining === null) return;
@@ -225,7 +243,11 @@ export function MintPanel() {
                         ? "Granting..."
                         : "Grant MINT_ROLE"}
                   </button>
-                  {grantError && <p className="text-xs text-red-600">{formatContractError(grantError)}</p>}
+                  {grantError && (
+                    <p className={`text-xs ${isUserRejection(grantError) ? "text-zinc-400" : "text-red-600"}`}>
+                      {formatContractError(grantError)}
+                    </p>
+                  )}
                   {isGrantSuccess && (
                     <p className="text-xs text-emerald-700">
                       Granted — you can mint now.
@@ -279,7 +301,11 @@ export function MintPanel() {
                 {isPending ? "Confirm in wallet..." : isConfirming ? "Minting..." : "Mint"}
               </button>
 
-              {writeError && <p className="text-sm text-red-600">{formatContractError(writeError)}</p>}
+              {writeError && (
+                <p className={`text-sm ${isUserRejection(writeError) ? "text-zinc-400" : "text-red-600"}`}>
+                  {formatContractError(writeError)}
+                </p>
+              )}
 
               {isSuccess && (
                 <div className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800">

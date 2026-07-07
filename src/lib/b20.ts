@@ -1,6 +1,7 @@
 import {
   BaseError,
   ContractFunctionRevertedError,
+  UserRejectedRequestError,
   type Address,
   type Hex,
   encodeAbiParameters,
@@ -241,6 +242,94 @@ export function encodeUpdateSupplyCap(newSupplyCap: bigint): Hex {
   });
 }
 
+export const b20DeployerAbi = [
+  {
+    type: "function",
+    name: "deployB20Token",
+    stateMutability: "payable",
+    inputs: [
+      { name: "variant", type: "uint8" },
+      { name: "salt", type: "bytes32" },
+      { name: "params", type: "bytes" },
+      { name: "initCalls", type: "bytes[]" },
+    ],
+    outputs: [{ name: "token", type: "address" }],
+  },
+  {
+    type: "function",
+    name: "deployFee",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ type: "uint256" }],
+  },
+  {
+    type: "function",
+    name: "setFee",
+    stateMutability: "nonpayable",
+    inputs: [{ name: "newFee", type: "uint256" }],
+    outputs: [],
+  },
+  {
+    type: "function",
+    name: "withdraw",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "to", type: "address" },
+      { name: "amount", type: "uint256" },
+    ],
+    outputs: [],
+  },
+  {
+    type: "function",
+    name: "withdrawAll",
+    stateMutability: "nonpayable",
+    inputs: [{ name: "to", type: "address" }],
+    outputs: [],
+  },
+  {
+    type: "function",
+    name: "balance",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ type: "uint256" }],
+  },
+  {
+    type: "function",
+    name: "owner",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ type: "address" }],
+  },
+  {
+    type: "function",
+    name: "transferOwnership",
+    stateMutability: "nonpayable",
+    inputs: [{ name: "newOwner", type: "address" }],
+    outputs: [],
+  },
+  {
+    type: "function",
+    name: "acceptOwnership",
+    stateMutability: "nonpayable",
+    inputs: [],
+    outputs: [],
+  },
+  {
+    type: "event",
+    name: "TokenDeployed",
+    inputs: [
+      { name: "deployer", type: "address", indexed: true },
+      { name: "token", type: "address", indexed: true },
+      { name: "feePaid", type: "uint256", indexed: false },
+    ],
+  },
+  { type: "error", name: "InsufficientFee", inputs: [{ name: "required", type: "uint256" }, { name: "provided", type: "uint256" }] },
+  { type: "error", name: "Unauthorized", inputs: [] },
+  { type: "error", name: "ZeroAddress", inputs: [] },
+  { type: "error", name: "TransferFailed", inputs: [] },
+  { type: "error", name: "NoPendingOwner", inputs: [] },
+] as const;
+
 // Pulls the new token address out of the B20Created event (token is topics[1], left-padded to 32 bytes).
 export function extractTokenAddress(
   logs: readonly { address: Address; topics: readonly Hex[] }[],
@@ -264,8 +353,17 @@ const CONTRACT_ERROR_MESSAGES: Record<string, string> = {
   InvalidSender: "Invalid sender address.",
 };
 
+// Returns true when the user dismissed/cancelled the wallet prompt.
+export function isUserRejection(error: unknown): boolean {
+  if (error instanceof UserRejectedRequestError) return true;
+  if (error instanceof BaseError)
+    return error.walk((e) => e instanceof UserRejectedRequestError) !== null;
+  return false;
+}
+
 // Decodes a viem/wagmi contract error into a short, human-readable message.
 export function formatContractError(error: unknown): string {
+  if (isUserRejection(error)) return "Transaction cancelled.";
   if (error instanceof BaseError) {
     const revertError = error.walk(
       (e) => e instanceof ContractFunctionRevertedError,

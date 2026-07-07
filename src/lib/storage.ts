@@ -9,11 +9,14 @@ export interface DeployedToken {
 
 const STORAGE_KEY = "b20-deployed-tokens";
 
-export function getDeployedTokens(): DeployedToken[] {
+// Pass chainId to only return tokens deployed on that network — a token saved while on
+// Sepolia doesn't exist on Mainnet (and vice versa), so mixing them in a picker is wrong.
+export function getDeployedTokens(chainId?: number): DeployedToken[] {
   if (typeof window === "undefined") return [];
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as DeployedToken[]) : [];
+    const tokens = raw ? (JSON.parse(raw) as DeployedToken[]) : [];
+    return chainId === undefined ? tokens : tokens.filter((t) => t.chainId === chainId);
   } catch {
     return [];
   }

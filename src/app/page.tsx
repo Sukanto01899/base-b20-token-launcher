@@ -1,18 +1,18 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { keccak256, toBytes } from "viem";
+import { formatEther, keccak256, toBytes } from "viem";
 import {
   useAccount,
-  useSwitchChain,
+  useReadContract,
   useWaitForTransactionReceipt,
   useWriteContract,
 } from "wagmi";
-import { baseSepolia } from "wagmi/chains";
+import { base, baseSepolia } from "wagmi/chains";
 import { CheckMemoPanel } from "@/components/CheckMemoPanel";
 import { MintPanel } from "@/components/MintPanel";
 import { PaymentPanel } from "@/components/PaymentPanel";
-import { FEATURES } from "@/lib/config";
+import { B20_DEPLOYER_ADDRESSES, FEATURES } from "@/lib/config";
 import { saveDeployedToken } from "@/lib/storage";
 import {
   B20Variant,
@@ -20,12 +20,15 @@ import {
   BUILDER_CODE_DATA_SUFFIX,
   MINT_ROLE,
   NO_SUPPLY_CAP,
+  b20DeployerAbi,
   b20FactoryAbi,
   encodeAssetCreateParams,
   encodeGrantRole,
   encodeStablecoinCreateParams,
   encodeUpdateSupplyCap,
   extractTokenAddress,
+  formatContractError,
+  isUserRejection,
 } from "@/lib/b20";
 
 const VARIANT_INFO = {
@@ -111,7 +114,6 @@ function FaqButton({ onClick }: { onClick: () => void }) {
 
 export default function Home() {
   const { address, isConnected, chainId } = useAccount();
-  const { switchChain, isPending: isSwitching } = useSwitchChain();
 
   const visibleTabs: TabId[] = FEATURES.paymentWithMemo
     ? ["deploy", "mint", "payment"]
@@ -126,6 +128,15 @@ export default function Home() {
   const [grantMint, setGrantMint] = useState(true);
   const [noCap, setNoCap] = useState(true);
   const [supplyCap, setSupplyCap] = useState("1000000");
+
+  const deployerAddress = chainId ? B20_DEPLOYER_ADDRESSES[chainId] : undefined;
+
+  const { data: deployFee = 0n } = useReadContract({
+    address: deployerAddress,
+    abi: b20DeployerAbi,
+    functionName: "deployFee",
+    query: { enabled: !!deployerAddress },
+  });
 
   const {
     writeContract,
@@ -144,7 +155,13 @@ export default function Home() {
     () => (receipt ? extractTokenAddress(receipt.logs) : null),
     [receipt],
   );
-  const onWrongNetwork = isConnected && chainId !== baseSepolia.id;
+  const onWrongNetwork = isConnected && chainId !== baseSepolia.id && chainId !== base.id;
+
+  function basescanUrl(addr: string) {
+    return chainId === base.id
+      ? `https://basescan.org/address/${addr}`
+      : `https://sepolia.basescan.org/address/${addr}`;
+  }
 
   useEffect(() => {
     if (isSuccess && tokenAddress && address && chainId) {
@@ -185,6 +202,7 @@ export default function Home() {
     grantMint,
     noCap,
     supplyCap,
+    chainId,
     reset,
   ]);
 
@@ -212,13 +230,24 @@ export default function Home() {
     if (grantMint) initCalls.push(encodeGrantRole(MINT_ROLE, address));
     initCalls.push(encodeUpdateSupplyCap(cap));
 
-    writeContract({
-      address: B20_FACTORY_ADDRESS,
-      abi: b20FactoryAbi,
-      functionName: "createB20",
-      args: [B20Variant[variant], salt, params, initCalls],
-      dataSuffix: BUILDER_CODE_DATA_SUFFIX,
-    });
+    if (deployerAddress) {
+      writeContract({
+        address: deployerAddress,
+        abi: b20DeployerAbi,
+        functionName: "deployB20Token",
+        args: [B20Variant[variant], salt, params, initCalls],
+        value: deployFee,
+        dataSuffix: BUILDER_CODE_DATA_SUFFIX,
+      });
+    } else {
+      writeContract({
+        address: B20_FACTORY_ADDRESS,
+        abi: b20FactoryAbi,
+        functionName: "createB20",
+        args: [B20Variant[variant], salt, params, initCalls],
+        dataSuffix: BUILDER_CODE_DATA_SUFFIX,
+      });
+    }
   }
 
   const info = VARIANT_INFO[variant];
@@ -358,19 +387,6 @@ export default function Home() {
 
   const deployFormBlock = (
     <div className="flex flex-col gap-4 rounded-xl border border-zinc-200 bg-white p-5">
-      {onWrongNetwork && (
-        <div className="flex items-center justify-between rounded-lg bg-amber-50 p-3 text-sm text-amber-800">
-          Wrong network — switch to Base Sepolia.
-          <button
-            onClick={() => switchChain({ chainId: baseSepolia.id })}
-            disabled={isSwitching}
-            className="ml-2 rounded-full bg-amber-600 px-3 py-1 text-xs font-medium text-white disabled:opacity-50"
-          >
-            Switch
-          </button>
-        </div>
-      )}
-
       <label className="flex flex-col gap-1 text-sm text-foreground">
         Name
         <input
@@ -468,14 +484,26 @@ export default function Home() {
             : "Deploy B20 Token"}
       </button>
 
-      {error && <p className="text-sm text-red-600">{error.message}</p>}
+      {deployFee > 0n && !isSuccess && (
+        <p className="text-center text-xs text-zinc-500">
+          A small deploy fee of{" "}
+          <span className="font-medium text-red-500">{formatEther(deployFee)} ETH</span>{" "}
+          is required.
+        </p>
+      )}
+
+      {error && (
+        <p className={`text-sm ${isUserRejection(error) ? "text-zinc-400" : "text-red-600"}`}>
+          {formatContractError(error)}
+        </p>
+      )}
 
       {isSuccess && (
         <div className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800">
           Token deployed!
           {tokenAddress && (
             <a
-              href={`https://sepolia.basescan.org/address/${tokenAddress}`}
+              href={basescanUrl(tokenAddress)}
               target="_blank"
               rel="noopener noreferrer"
               className="block break-all font-mono underline"
