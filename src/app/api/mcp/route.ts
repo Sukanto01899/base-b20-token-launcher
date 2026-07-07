@@ -228,7 +228,7 @@ async function runTool(id: unknown, name: string, args: Record<string, unknown>)
         if (!isAddress(initialAdmin!)) throw new Error("initialAdmin is not a valid address");
 
         // Check activation for the requested variant on this chain
-        const activation = await checkActivation(chainId);
+        const activation = await checkActivation(chainId!);
         const variantActive = variant === "ASSET" ? activation.asset : activation.stablecoin;
         if (!variantActive)
           return ok(id, `⚠️ B20 ${variant} is not yet activated on ${activation.network}. Deployment will fail until Base enables it.\n\nYou can check status anytime: ask me to run b20_check_activation.`);
@@ -247,7 +247,7 @@ async function runTool(id: unknown, name: string, args: Record<string, unknown>)
 
         const salt = keccak256(toBytes(`${symbol}-${Date.now()}-${Math.random()}`));
 
-        const deployerAddress = B20_DEPLOYER_ADDRESSES[chainId];
+        const deployerAddress = B20_DEPLOYER_ADDRESSES[chainId!];
 
         if (deployerAddress) {
           // Route through platform deployer — reads fee from contract, passes as value
@@ -261,7 +261,7 @@ async function runTool(id: unknown, name: string, args: Record<string, unknown>)
           const data = encodeFunctionData({
             abi: b20DeployerAbi,
             functionName: "deployB20Token",
-            args: [B20Variant[variant], salt, encodedParams, initCalls],
+            args: [B20Variant[variant!], salt, encodedParams, initCalls],
           });
 
           return ok(id, JSON.stringify({
@@ -277,7 +277,7 @@ async function runTool(id: unknown, name: string, args: Record<string, unknown>)
         const data = encodeFunctionData({
           abi: b20FactoryAbi,
           functionName: "createB20",
-          args: [B20Variant[variant], salt, encodedParams, initCalls],
+          args: [B20Variant[variant!], salt, encodedParams, initCalls],
         });
 
         return ok(id, JSON.stringify({
