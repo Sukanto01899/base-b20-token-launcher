@@ -1,11 +1,80 @@
 import type { Metadata } from "next";
+import { CodeBlock } from "./CodeBlock";
 
 export const metadata: Metadata = {
   title: "B20 MCP — AI Integration Guide",
-  description: "Connect any AI assistant to B20 tokens on Base using the B20 MCP server.",
+  description:
+    "Connect Claude, ChatGPT, or any MCP-compatible AI to B20 tokens on Base. Deploy tokens, mint supply, and send payments using natural language — no code needed.",
+  keywords: [
+    "B20 MCP server",
+    "AI token deployment",
+    "Claude Base integration",
+    "MCP Base blockchain",
+    "deploy token AI",
+    "B20 token AI agent",
+    "Base MCP",
+    "crypto AI assistant",
+  ],
+  alternates: {
+    canonical: "https://www.deployb20.xyz/mcp",
+  },
+  openGraph: {
+    type: "website",
+    url: "https://www.deployb20.xyz/mcp",
+    title: "B20 MCP — AI Integration Guide",
+    description:
+      "Connect Claude, ChatGPT, or any MCP-compatible AI to B20 tokens on Base. Deploy tokens, mint supply, and send payments using natural language.",
+    images: [{ url: "/og-image.png", width: 1200, height: 630, alt: "B20 MCP Server" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "B20 MCP — AI Integration Guide",
+    description:
+      "Connect any AI to B20 tokens on Base. Deploy, mint, and pay using natural language.",
+    images: ["/og-image.png"],
+  },
 };
 
 const MCP_URL = "https://www.deployb20.xyz/api/mcp";
+
+const faqJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  mainEntity: [
+    {
+      "@type": "Question",
+      name: "What is the B20 MCP server?",
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: "The B20 MCP server lets any AI assistant (Claude, ChatGPT, etc.) deploy and interact with B20 tokens on Base using natural language. It encodes blockchain transactions without ever holding a private key.",
+      },
+    },
+    {
+      "@type": "Question",
+      name: "How do I connect Claude to B20 tokens on Base?",
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: "Run: claude mcp add b20 --transport http https://www.deployb20.xyz/api/mcp in your terminal. Then add Base MCP for wallet support: claude mcp add base-mcp --transport http https://mcp.base.org",
+      },
+    },
+    {
+      "@type": "Question",
+      name: "Does the B20 MCP server hold my private key?",
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: "No. The B20 MCP server is a calldata builder only — it encodes transactions but never holds or touches your private key. Your wallet (via Base MCP) signs and sends the transaction.",
+      },
+    },
+    {
+      "@type": "Question",
+      name: "Can I use B20 MCP with Claude Web?",
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: "Yes. Go to claude.ai → Settings → Connectors → Add custom connector and paste https://www.deployb20.xyz/api/mcp. You can read token info and check activation without a wallet.",
+      },
+    },
+  ],
+};
 
 function Step({ n, title, children }: { n: number; title: string; children: React.ReactNode }) {
   return (
@@ -13,19 +82,11 @@ function Step({ n, title, children }: { n: number; title: string; children: Reac
       <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-bold text-white">
         {n}
       </div>
-      <div className="flex-1">
+      <div className="min-w-0 flex-1">
         <h3 className="font-semibold text-foreground">{title}</h3>
         <div className="mt-1 text-sm text-zinc-600">{children}</div>
       </div>
     </div>
-  );
-}
-
-function Code({ children }: { children: string }) {
-  return (
-    <pre className="mt-2 overflow-x-auto rounded-lg bg-zinc-900 px-4 py-3 text-sm text-zinc-100">
-      <code>{children}</code>
-    </pre>
   );
 }
 
@@ -49,6 +110,10 @@ function Badge({ children }: { children: React.ReactNode }) {
 export default function McpPage() {
   return (
     <div className="flex flex-1 justify-center bg-white">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
+      />
       <main className="w-full max-w-3xl px-6 py-12">
 
         {/* Header */}
@@ -59,9 +124,9 @@ export default function McpPage() {
             Connect Claude, or any MCP-compatible AI, to B20 tokens on Base.
             Deploy tokens, mint supply, send payments — all from natural language.
           </p>
-          <div className="mt-4 flex items-center gap-2 rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-2">
-            <span className="text-xs text-zinc-500">Server URL</span>
-            <code className="flex-1 text-xs font-medium text-foreground">{MCP_URL}</code>
+          <div className="mt-4 flex items-center gap-2 overflow-x-auto rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-2">
+            <span className="shrink-0 text-xs text-zinc-500">Server URL</span>
+            <code className="min-w-0 break-all text-xs font-medium text-foreground">{MCP_URL}</code>
           </div>
         </div>
 
@@ -93,20 +158,24 @@ export default function McpPage() {
           <div className="flex flex-col gap-5">
             <Step n={1} title="Add B20 MCP">
               Run this once in your terminal:
-              <Code>{`claude mcp add b20 --transport http ${MCP_URL}`}</Code>
+              <CodeBlock>{`claude mcp add b20 --transport http ${MCP_URL}`}</CodeBlock>
             </Step>
 
             <Step n={2} title="Add Base MCP (for sending transactions)">
               Base MCP gives Claude a wallet so it can actually send the transactions:
-              <Code>{`claude mcp add base-mcp --transport http https://mcp.base.org`}</Code>
+              <CodeBlock>{`claude mcp add base-mcp --transport http https://mcp.base.org`}</CodeBlock>
             </Step>
 
             <Step n={3} title="Start chatting">
               You can now tell Claude to deploy, mint, or pay:
-              <Code>{`Deploy a B20 token called GameCoin with symbol GC on Base Sepolia.
-My wallet is 0x4b2f...74A6b`}</Code>
-              <Code>{`Mint 1000 GC tokens to 0xRecipient...`}</Code>
-              <Code>{`Send 50 GC to 0xShop... with memo "order-42"`}</Code>
+              <CodeBlock>{`Deploy a B20 ASSET token called GameCoin (symbol GC, 18 decimals)
+on Base Sepolia. My wallet is 0x4b2f...74A6b`}</CodeBlock>
+              <CodeBlock>{`Deploy a B20 STABLECOIN called MyDollar (symbol MUSD, currency USD)
+on Base Sepolia. My wallet is 0x4b2f...74A6b`}</CodeBlock>
+              <CodeBlock>{`Mint 1000 GC tokens to 0xRecipient... on Base Sepolia`}</CodeBlock>
+              <CodeBlock>{`Send 50 GC to 0xShop... with memo "order-42"`}</CodeBlock>
+              <CodeBlock>{`Read token info for 0xTokenAddress on Base Sepolia.
+Also check if 0xMyWallet has MINT_ROLE.`}</CodeBlock>
             </Step>
           </div>
         </section>
@@ -121,11 +190,11 @@ My wallet is 0x4b2f...74A6b`}</Code>
               Open claude.ai → Settings → Connectors → Add custom connector
             </Step>
             <Step n={2} title="Paste the server URL">
-              <Code>{MCP_URL}</Code>
+              <CodeBlock>{MCP_URL}</CodeBlock>
             </Step>
             <Step n={3} title="Try it">
-              <Code>{`Check if B20 is activated on Base Mainnet`}</Code>
-              <Code>{`Read token info for 0xTokenAddress on Base Sepolia`}</Code>
+              <CodeBlock>{`Check if B20 is activated on Base Mainnet`}</CodeBlock>
+              <CodeBlock>{`Read token info for 0xTokenAddress on Base Sepolia`}</CodeBlock>
             </Step>
           </div>
         </section>
@@ -136,14 +205,14 @@ My wallet is 0x4b2f...74A6b`}</Code>
           <p className="mb-4 text-sm text-zinc-500">Any app that supports MCP over HTTP can connect to this server.</p>
 
           <Card title="MCP JSON-RPC — list tools">
-            <Code>{`curl -X POST ${MCP_URL} \\
+            <CodeBlock>{`curl -X POST ${MCP_URL} \\
   -H "Content-Type: application/json" \\
-  -d '{"jsonrpc":"2.0","method":"tools/list","id":1}'`}</Code>
+  -d '{"jsonrpc":"2.0","method":"tools/list","id":1}'`}</CodeBlock>
           </Card>
 
           <div className="mt-3">
-            <Card title="Call a tool — encode a deploy">
-              <Code>{`curl -X POST ${MCP_URL} \\
+            <Card title="Call a tool — encode an ASSET deploy">
+              <CodeBlock>{`curl -X POST ${MCP_URL} \\
   -H "Content-Type: application/json" \\
   -d '{
     "jsonrpc": "2.0",
@@ -155,12 +224,15 @@ My wallet is 0x4b2f...74A6b`}</Code>
         "name": "GameCoin",
         "symbol": "GC",
         "variant": "ASSET",
+        "decimals": 18,
         "initialAdmin": "0xYourWallet",
-        "chainId": 84532
+        "chainId": 84532,
+        "grantMintRole": true,
+        "supplyCap": "1000000"
       }
     }
-  }'`}</Code>
-              <p className="mt-2 text-xs text-zinc-500">Returns <code className="rounded bg-zinc-100 px-1 py-0.5">&#123;to, data, value&#125;</code> — pass to your wallet to send.</p>
+  }'`}</CodeBlock>
+              <p className="mt-2 text-xs text-zinc-500">Returns <code className="rounded bg-zinc-100 px-1 py-0.5">&#123;to, data, value, fee_eth&#125;</code> — pass to your wallet to send. Use <code className="rounded bg-zinc-100 px-1 py-0.5">variant: &quot;STABLECOIN&quot;</code> with <code className="rounded bg-zinc-100 px-1 py-0.5">currency: &quot;USD&quot;</code> instead of <code className="rounded bg-zinc-100 px-1 py-0.5">decimals</code> for a stablecoin.</p>
             </Card>
           </div>
         </section>
@@ -197,17 +269,17 @@ My wallet is 0x4b2f...74A6b`}</Code>
               </thead>
               <tbody className="divide-y divide-zinc-100 text-foreground">
                 {[
-                  ["b20_encode_deploy", "Encode token deployment (routes through platform contract)", "Yes"],
-                  ["b20_encode_mint", "Encode mint call", "Yes"],
-                  ["b20_encode_payment", "Encode transferWithMemo", "Yes"],
-                  ["b20_encode_grant_mint_role", "Encode MINT_ROLE grant", "Yes"],
-                  ["b20_read_token", "Read token name / supply / cap", "No"],
-                  ["b20_check_activation", "Check if B20 is active on chain", "No"],
+                  ["b20_encode_deploy", "Encode ASSET or STABLECOIN deployment. Optional: grantMintRole (default true), supplyCap. Routes through platform deployer when configured (fee applies).", "Yes"],
+                  ["b20_encode_mint", "Encode mint call. Checks B20 activation first — returns a clear error if not yet active on the chain.", "Yes"],
+                  ["b20_encode_payment", "Encode transferWithMemo. memo is optional (max 32 bytes) — omit for a plain transfer.", "Yes"],
+                  ["b20_encode_grant_mint_role", "Encode MINT_ROLE grant. Caller must hold DEFAULT_ADMIN_ROLE on the token.", "Yes"],
+                  ["b20_read_token", "Read name, symbol, decimals, totalSupply, supplyCap, network. Pass checkMintRole address to also check if it holds MINT_ROLE.", "No"],
+                  ["b20_check_activation", "Check if B20 ASSET and STABLECOIN are active on Base Mainnet or Sepolia.", "No"],
                 ].map(([tool, desc, wallet]) => (
                   <tr key={tool}>
-                    <td className="px-4 py-3 font-mono text-xs text-primary">{tool}</td>
+                    <td className="px-4 py-3 align-top font-mono text-xs text-primary">{tool}</td>
                     <td className="px-4 py-3 text-zinc-600">{desc}</td>
-                    <td className="px-4 py-3">{wallet === "Yes" ? "✅ Yes" : "❌ No"}</td>
+                    <td className="px-4 py-3 align-top">{wallet === "Yes" ? "✅ Yes" : "❌ No"}</td>
                   </tr>
                 ))}
               </tbody>
