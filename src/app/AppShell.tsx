@@ -188,6 +188,7 @@ export function AppShell() {
         functionName: "deployB20Token",
         args: [B20Variant[variant], salt, params, initCalls],
         value: deployFee,
+        gas: 500_000n,
         dataSuffix: BUILDER_CODE_DATA_SUFFIX,
       });
     } else {
@@ -196,6 +197,7 @@ export function AppShell() {
         abi: b20FactoryAbi,
         functionName: "createB20",
         args: [B20Variant[variant], salt, params, initCalls],
+        gas: 500_000n,
         dataSuffix: BUILDER_CODE_DATA_SUFFIX,
       });
     }

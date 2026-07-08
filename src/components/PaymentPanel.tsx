@@ -4,6 +4,11 @@ import { useEffect, useMemo, useState } from "react";
 import { formatUnits, isAddress, parseUnits, stringToHex, type Address, type Hex } from "viem";
 import { useAccount, useReadContracts, useWaitForTransactionReceipt, useWriteContract } from "wagmi";
 import { BUILDER_CODE_DATA_SUFFIX, b20TokenAbi, formatContractError, isUserRejection } from "@/lib/b20";
+
+function basescanTxUrl(chainId: number | undefined, hash: string): string {
+  const base = chainId === 8453 ? "https://basescan.org" : "https://sepolia.basescan.org";
+  return `${base}/tx/${hash}`;
+}
 import { getDeployedTokens } from "@/lib/storage";
 
 function safeMemoToHex(memo: string): Hex | null {
@@ -78,7 +83,11 @@ export function PaymentPanel() {
     balance?.status === "success";
 
   const { writeContract, data: hash, isPending, error: writeError, reset } = useWriteContract();
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
+  const {
+    isLoading: isConfirming,
+    isSuccess,
+    error: receiptError,
+  } = useWaitForTransactionReceipt({ hash });
 
   // A tx hash from one network means nothing on another — waiting on it there would hang
   // forever, leaving the button stuck on "Sending...". Clear it on network switch.
@@ -114,6 +123,7 @@ export function PaymentPanel() {
       abi: b20TokenAbi,
       functionName: "transferWithMemo",
       args: [recipient, amountBigInt, memoHex],
+      gas: 150_000n,
       dataSuffix: BUILDER_CODE_DATA_SUFFIX,
     });
   }
@@ -242,12 +252,31 @@ export function PaymentPanel() {
             </p>
           )}
 
+          {receiptError && !isPending && !isConfirming && (
+            <p className="text-sm text-red-600">
+              Transaction failed on-chain: {formatContractError(receiptError)}
+              {hash && (
+                <>
+                  {" — "}
+                  <a
+                    href={basescanTxUrl(chainId, hash)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline"
+                  >
+                    View on explorer
+                  </a>
+                </>
+              )}
+            </p>
+          )}
+
           {isSuccess && (
             <div className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800">
               Payment sent successfully.
               {hash && (
                 <a
-                  href={`https://sepolia.basescan.org/tx/${hash}`}
+                  href={basescanTxUrl(chainId, hash)}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="ml-2 underline"
