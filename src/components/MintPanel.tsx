@@ -83,7 +83,11 @@ export function MintPanel() {
   const remaining = tokenLoaded && !isUnlimited ? supplyCap!.result! - totalSupply!.result! : null;
 
   const { writeContract, data: hash, isPending, error: writeError, reset } = useWriteContract();
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
+  const {
+    isLoading: isConfirming,
+    isSuccess,
+    error: receiptError,
+  } = useWaitForTransactionReceipt({ hash });
 
   const {
     writeContract: writeGrant,
@@ -92,9 +96,11 @@ export function MintPanel() {
     error: grantError,
     reset: resetGrant,
   } = useWriteContract();
-  const { isLoading: isGrantConfirming, isSuccess: isGrantSuccess } = useWaitForTransactionReceipt({
-    hash: grantHash,
-  });
+  const {
+    isLoading: isGrantConfirming,
+    isSuccess: isGrantSuccess,
+    error: grantReceiptError,
+  } = useWaitForTransactionReceipt({ hash: grantHash });
 
   useEffect(() => {
     if (isGrantSuccess) refetch();
@@ -120,6 +126,7 @@ export function MintPanel() {
       abi: b20TokenAbi,
       functionName: "grantRole",
       args: [MINT_ROLE, grantAddress],
+      gas: 120_000n,
       dataSuffix: BUILDER_CODE_DATA_SUFFIX,
     });
   }
@@ -132,6 +139,7 @@ export function MintPanel() {
       abi: b20TokenAbi,
       functionName: "mint",
       args: [account, amountBigInt],
+      gas: 150_000n,
       dataSuffix: BUILDER_CODE_DATA_SUFFIX,
     });
   }
@@ -248,12 +256,17 @@ export function MintPanel() {
                       {formatContractError(grantError)}
                     </p>
                   )}
+                  {grantReceiptError && !isGrantPending && !isGrantConfirming && (
+                    <p className="text-xs text-red-600">
+                      {formatContractError(grantReceiptError)}
+                    </p>
+                  )}
                   {isGrantSuccess && (
                     <p className="text-xs text-emerald-700">
                       Granted — you can mint now.
                       {grantHash && (
                         <a
-                          href={`https://sepolia.basescan.org/tx/${grantHash}`}
+                          href={basescanTxUrl(chainId, grantHash)}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="ml-2 underline"
@@ -307,12 +320,31 @@ export function MintPanel() {
                 </p>
               )}
 
+              {receiptError && !isPending && !isConfirming && (
+                <p className="text-sm text-red-600">
+                  Transaction failed on-chain: {formatContractError(receiptError)}
+                  {hash && (
+                    <>
+                      {" — "}
+                      <a
+                        href={basescanTxUrl(chainId, hash)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="underline"
+                      >
+                        View on explorer
+                      </a>
+                    </>
+                  )}
+                </p>
+              )}
+
               {isSuccess && (
                 <div className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800">
                   Minted successfully.
                   {hash && (
                     <a
-                      href={`https://sepolia.basescan.org/tx/${hash}`}
+                      href={basescanTxUrl(chainId, hash)}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="ml-2 underline"
@@ -339,6 +371,11 @@ export function MintPanel() {
       )}
     </div>
   );
+}
+
+function basescanTxUrl(chainId: number | undefined, hash: string): string {
+  const base = chainId === 8453 ? "https://basescan.org" : "https://sepolia.basescan.org";
+  return `${base}/tx/${hash}`;
 }
 
 function safeParseUnits(value: string, decimals: number): bigint | null {
