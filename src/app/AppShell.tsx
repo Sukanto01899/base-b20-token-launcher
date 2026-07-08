@@ -133,8 +133,8 @@ export function AppShell() {
   } = useWaitForTransactionReceipt({ hash });
 
   const tokenAddress = useMemo(
-    () => (receipt ? extractTokenAddress(receipt.logs) : null),
-    [receipt],
+    () => (receipt ? extractTokenAddress(receipt.logs, deployerAddress) : null),
+    [receipt, deployerAddress],
   );
   const onWrongNetwork = isConnected && chainId !== baseSepolia.id && chainId !== base.id;
 

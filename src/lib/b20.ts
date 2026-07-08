@@ -330,15 +330,38 @@ export const b20DeployerAbi = [
   { type: "error", name: "NoPendingOwner", inputs: [] },
 ] as const;
 
-// Pulls the new token address out of the B20Created event (token is topics[1], left-padded to 32 bytes).
+// keccak256("TokenDeployed(address,address,uint256)") — B20Deployer event selector
+const TOKEN_DEPLOYED_TOPIC = keccak256(toBytes("TokenDeployed(address,address,uint256)"));
+
+// Pulls the new token address from receipt logs.
+// Primary:  factory's B20Created event — topics[1] is the token (direct deploy)
+// Fallback: deployer's TokenDeployed event — topics[2] is the token (fee-gated deploy)
 export function extractTokenAddress(
   logs: readonly { address: Address; topics: readonly Hex[] }[],
+  deployerAddress?: Address,
 ): Address | null {
-  const log = logs.find(
+  // Factory log — direct call or internal call from deployer
+  const factoryLog = logs.find(
     (l) => l.address.toLowerCase() === B20_FACTORY_ADDRESS.toLowerCase(),
   );
-  if (!log || !log.topics[1]) return null;
-  return `0x${log.topics[1].slice(-40)}` as Address;
+  if (factoryLog?.topics[1]) {
+    return `0x${factoryLog.topics[1].slice(-40)}` as Address;
+  }
+
+  // Deployer's TokenDeployed(address indexed deployer, address indexed token, uint256 feePaid)
+  // topics[0] = selector, topics[1] = deployer, topics[2] = token
+  if (deployerAddress) {
+    const deployerLog = logs.find(
+      (l) =>
+        l.address.toLowerCase() === deployerAddress.toLowerCase() &&
+        l.topics[0]?.toLowerCase() === TOKEN_DEPLOYED_TOPIC.toLowerCase(),
+    );
+    if (deployerLog?.topics[2]) {
+      return `0x${deployerLog.topics[2].slice(-40)}` as Address;
+    }
+  }
+
+  return null;
 }
 
 const CONTRACT_ERROR_MESSAGES: Record<string, string> = {
