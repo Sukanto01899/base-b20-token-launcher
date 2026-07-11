@@ -232,7 +232,7 @@ Also check if 0xMyWallet has MINT_ROLE.`}</CodeBlock>
       }
     }
   }'`}</CodeBlock>
-              <p className="mt-2 text-xs text-zinc-500">Returns <code className="rounded bg-zinc-100 px-1 py-0.5">&#123;to, data, value, fee_eth&#125;</code> — pass to your wallet to send. Use <code className="rounded bg-zinc-100 px-1 py-0.5">variant: &quot;STABLECOIN&quot;</code> with <code className="rounded bg-zinc-100 px-1 py-0.5">currency: &quot;USD&quot;</code> instead of <code className="rounded bg-zinc-100 px-1 py-0.5">decimals</code> for a stablecoin.</p>
+              <p className="mt-2 text-xs text-zinc-500">Returns <code className="rounded bg-zinc-100 px-1 py-0.5">&#123;to, data, value&#125;</code> — pass to your wallet to send. Deploys directly from your wallet via the B20 factory (no middleman, no fee). Use <code className="rounded bg-zinc-100 px-1 py-0.5">variant: &quot;STABLECOIN&quot;</code> with <code className="rounded bg-zinc-100 px-1 py-0.5">currency: &quot;USD&quot;</code> instead of <code className="rounded bg-zinc-100 px-1 py-0.5">decimals</code> for a stablecoin.</p>
             </Card>
           </div>
         </section>
@@ -269,7 +269,7 @@ Also check if 0xMyWallet has MINT_ROLE.`}</CodeBlock>
               </thead>
               <tbody className="divide-y divide-zinc-100 text-foreground">
                 {[
-                  ["b20_encode_deploy", "Encode ASSET or STABLECOIN deployment. Optional: grantMintRole (default true), supplyCap. Routes through platform deployer when configured (fee applies).", "Yes"],
+                  ["b20_encode_deploy", "Encode ASSET or STABLECOIN deployment. Calls factory directly — deploys from user's own wallet, no fee. Optional: grantMintRole (default true), supplyCap.", "Yes"],
                   ["b20_encode_mint", "Encode mint call. Checks B20 activation first — returns a clear error if not yet active on the chain.", "Yes"],
                   ["b20_encode_payment", "Encode transferWithMemo. memo is optional (max 32 bytes) — omit for a plain transfer.", "Yes"],
                   ["b20_encode_grant_mint_role", "Encode MINT_ROLE grant. Caller must hold DEFAULT_ADMIN_ROLE on the token.", "Yes"],

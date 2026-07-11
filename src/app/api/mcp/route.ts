@@ -12,12 +12,19 @@ import {
   type Address,
 } from "viem";
 import { base, baseSepolia } from "viem/chains";
+
+// Gas ceilings for B20 precompile calls — estimation is unreliable on mainnet
+const GAS = {
+  deploy: "0x7A120",   // 500 000
+  mint:   "0x249F0",   // 150 000
+  grant:  "0x1D4C0",   // 120 000
+  transfer: "0x249F0", // 150 000
+} as const;
 import {
   B20_FACTORY_ADDRESS,
   B20Variant,
   MINT_ROLE,
   NO_SUPPLY_CAP,
-  b20DeployerAbi,
   b20FactoryAbi,
   b20TokenAbi,
   encodeAssetCreateParams,
@@ -25,7 +32,6 @@ import {
   encodeStablecoinCreateParams,
   encodeUpdateSupplyCap,
 } from "@/lib/b20";
-import { B20_DEPLOYER_ADDRESSES } from "@/lib/config";
 
 // ─────────────────────────────────────────────
 //  Tool definitions
@@ -36,8 +42,8 @@ const TOOLS = [
     name: "b20_encode_deploy",
     description:
       "Encode a B20 token deployment. Returns {to, data, value} ready for Base MCP send_calls. " +
-      "Routes through the platform deployer contract (fee collected) when available for the chain, " +
-      "otherwise calls the factory directly. Token is fully owned by initialAdmin after deploy.",
+      "Calls the B20 factory directly — token deploys from the user's own wallet with no middleman. " +
+      "Token is fully owned by initialAdmin after deploy.",
     inputSchema: {
       type: "object",
       required: ["name", "symbol", "variant", "initialAdmin"],
@@ -152,8 +158,12 @@ const TOOLS = [
 // ─────────────────────────────────────────────
 
 function getClient(chainId = 8453) {
+  if (chainId !== 8453 && chainId !== 84532)
+    throw new Error(`Unsupported chainId ${chainId}. Use 8453 (Base Mainnet) or 84532 (Base Sepolia).`);
   const chain = chainId === 8453 ? base : baseSepolia;
-  const rpc = chainId === 8453 ? "https://mainnet.base.org" : "https://sepolia.base.org";
+  const rpc = chainId === 8453
+    ? (process.env.BASE_RPC_URL ?? "https://mainnet.base.org")
+    : (process.env.BASE_SEPOLIA_RPC_URL ?? "https://sepolia.base.org");
   return createPublicClient({ chain, transport: http(rpc) });
 }
 
@@ -226,6 +236,8 @@ async function runTool(id: unknown, name: string, args: Record<string, unknown>)
           return ok(id, `Please provide the following before I can encode the deployment:\n${missing.map(m => `• ${m}`).join("\n")}`);
 
         if (!isAddress(initialAdmin!)) throw new Error("initialAdmin is not a valid address");
+        if (variant === "ASSET" && (decimals! < 6 || decimals! > 18))
+          throw new Error("decimals must be between 6 and 18");
 
         // Check activation for the requested variant on this chain
         const activation = await checkActivation(chainId!);
@@ -239,41 +251,22 @@ async function runTool(id: unknown, name: string, args: Record<string, unknown>)
             : encodeStablecoinCreateParams(tokenName!, symbol!, initialAdmin as Address, currency!.toUpperCase());
 
         const tokenDecimals = variant === "STABLECOIN" ? 6 : decimals!;
-        const cap = supplyCap ? BigInt(supplyCap) * 10n ** BigInt(tokenDecimals) : NO_SUPPLY_CAP;
+        // Validate supplyCap before BigInt conversion — floats and scientific notation throw
+        if (supplyCap !== undefined) {
+          if (!/^\d+$/.test(supplyCap)) throw new Error("supplyCap must be a whole number (e.g. 1000000)");
+          if (BigInt(supplyCap) <= 0n) throw new Error("supplyCap must be greater than 0");
+        }
+        const cap = supplyCap ? parseUnits(supplyCap, tokenDecimals) : NO_SUPPLY_CAP;
 
         const initCalls: `0x${string}`[] = [];
         if (grantMintRole) initCalls.push(encodeGrantRole(MINT_ROLE, initialAdmin as Address));
         initCalls.push(encodeUpdateSupplyCap(cap));
 
-        const salt = keccak256(toBytes(`${symbol}-${Date.now()}-${Math.random()}`));
+        // crypto.randomUUID gives enough entropy for a unique CREATE2 salt
+        const saltBytes = new Uint8Array(32);
+        crypto.getRandomValues(saltBytes);
+        const salt = `0x${Array.from(saltBytes).map(b => b.toString(16).padStart(2, "0")).join("")}` as `0x${string}`;
 
-        const deployerAddress = B20_DEPLOYER_ADDRESSES[chainId!];
-
-        if (deployerAddress) {
-          // Route through platform deployer — reads fee from contract, passes as value
-          const client = getClient(chainId);
-          const deployFee = await client.readContract({
-            address: deployerAddress,
-            abi: b20DeployerAbi,
-            functionName: "deployFee",
-          });
-
-          const data = encodeFunctionData({
-            abi: b20DeployerAbi,
-            functionName: "deployB20Token",
-            args: [B20Variant[variant!], salt, encodedParams, initCalls],
-          });
-
-          return ok(id, JSON.stringify({
-            to: deployerAddress,
-            data,
-            value: `0x${deployFee.toString(16)}`,
-            fee_eth: formatUnits(deployFee, 18),
-            description: `Deploy ${variant} B20 token: ${tokenName} (${symbol}) — fee: ${formatUnits(deployFee, 18)} ETH`,
-          }, null, 2));
-        }
-
-        // No deployer configured for this chain — call factory directly (no fee)
         const data = encodeFunctionData({
           abi: b20FactoryAbi,
           functionName: "createB20",
@@ -284,6 +277,7 @@ async function runTool(id: unknown, name: string, args: Record<string, unknown>)
           to: B20_FACTORY_ADDRESS,
           data,
           value: "0x0",
+          gas: GAS.deploy,
           description: `Deploy ${variant} B20 token: ${tokenName} (${symbol})`,
         }, null, 2));
       }
@@ -309,13 +303,15 @@ async function runTool(id: unknown, name: string, args: Record<string, unknown>)
         if (!activation.asset && !activation.stablecoin)
           return ok(id, `⚠️ B20 is not yet activated on ${activation.network}. Minting will fail until Base enables it.\n\nCheck status: ask me to run b20_check_activation.`);
 
+        if (!Number.isInteger(decimals)) throw new Error("decimals must be a whole number");
+
         const data = encodeFunctionData({
           abi: b20TokenAbi,
           functionName: "mint",
           args: [to! as Address, parseUnits(amount!, decimals!)],
         });
 
-        return ok(id, JSON.stringify({ to: tokenAddress, data, value: "0x0" }, null, 2));
+        return ok(id, JSON.stringify({ to: tokenAddress, data, value: "0x0", gas: GAS.mint }, null, 2));
       }
 
       // ── Payment ─────────────────────────────
@@ -332,7 +328,8 @@ async function runTool(id: unknown, name: string, args: Record<string, unknown>)
         if (askPay) return askPay;
         if (!isAddress(tokenAddress!)) throw new Error("Invalid tokenAddress");
         if (!isAddress(to!)) throw new Error("Invalid to address");
-        if (memo.length > 32) throw new Error("Memo exceeds 32 bytes");
+        // Use byte length, not char count — emoji can be 4 bytes per char
+        if (new TextEncoder().encode(memo).length > 32) throw new Error("Memo exceeds 32 bytes");
 
         const data = encodeFunctionData({
           abi: b20TokenAbi,
@@ -340,7 +337,7 @@ async function runTool(id: unknown, name: string, args: Record<string, unknown>)
           args: [to! as Address, parseUnits(amount!, decimals!), stringToHex(memo, { size: 32 })],
         });
 
-        return ok(id, JSON.stringify({ to: tokenAddress, data, value: "0x0", memo }, null, 2));
+        return ok(id, JSON.stringify({ to: tokenAddress, data, value: "0x0", gas: GAS.transfer, memo }, null, 2));
       }
 
       // ── Grant MINT_ROLE ─────────────────────
@@ -355,7 +352,7 @@ async function runTool(id: unknown, name: string, args: Record<string, unknown>)
         if (!isAddress(account!)) throw new Error("Invalid account");
 
         const data = encodeGrantRole(MINT_ROLE, account! as Address);
-        return ok(id, JSON.stringify({ to: tokenAddress, data, value: "0x0" }, null, 2));
+        return ok(id, JSON.stringify({ to: tokenAddress, data, value: "0x0", gas: GAS.grant }, null, 2));
       }
 
       // ── Read token ──────────────────────────
@@ -401,21 +398,10 @@ async function runTool(id: unknown, name: string, args: Record<string, unknown>)
       // ── Activation check ────────────────────
       case "b20_check_activation": {
         const { chainId = 8453 } = args as { chainId?: number };
-        const client = getClient(chainId);
-
-        const REGISTRY = "0x8453000000000000000000000000000000000001" as Address;
-        const abi = [{
-          type: "function", name: "isActivated", stateMutability: "view",
-          inputs: [{ name: "id", type: "bytes32" }], outputs: [{ type: "bool" }],
-        }] as const;
-
-        const [asset, stablecoin] = await Promise.all([
-          client.readContract({ address: REGISTRY, abi, functionName: "isActivated", args: [keccak256(toBytes("base.b20_asset"))] }),
-          client.readContract({ address: REGISTRY, abi, functionName: "isActivated", args: [keccak256(toBytes("base.b20_stablecoin"))] }),
-        ]);
+        const { asset, stablecoin, network } = await checkActivation(chainId);
 
         return ok(id, JSON.stringify({
-          network: chainId === 8453 ? "Base Mainnet" : "Base Sepolia",
+          network,
           asset_activated: asset,
           stablecoin_activated: stablecoin,
           status: asset && stablecoin ? "Both activated — ready to deploy" : "Not yet fully activated",
@@ -489,7 +475,15 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const body = await req.json();
+  let body: unknown;
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json(
+      { jsonrpc: "2.0", id: null, error: { code: -32700, message: "Parse error" } },
+      { headers: CORS },
+    );
+  }
 
   if (Array.isArray(body)) {
     const responses = await Promise.all(body.map(handleRequest));
